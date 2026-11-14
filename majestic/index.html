@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MAJESTIC-12 // PROTOCOLE GHOST</title>
+<style>
+  :root{
+    --green:#39ff6a; --amber:#ffb347; --red:#ff2b2b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace;}
+  #game{position:fixed;inset:0;background:#000;}
+
+  /* ================= 3D ================= */
+  #c3d{position:absolute;inset:0;width:100%;height:100%;display:none;}
+
+  /* ================= HUD ================= */
+  #hud{position:absolute;inset:0;display:none;pointer-events:none;color:#cfe3ff;
+       text-shadow:0 0 6px rgba(80,160,255,.8);font-size:clamp(11px,2.2vmin,16px);}
+  #hud .top{position:absolute;top:12px;left:0;right:0;display:flex;justify-content:center;}
+  #compass{width:52px;height:52px;border:1px solid rgba(140,190,255,.5);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;background:rgba(0,10,25,.45);font-size:24px;}
+  #compass .arr{display:inline-block;transition:transform .1s linear;color:#8fd0ff;}
+  #distLabel{position:absolute;top:70px;left:0;right:0;text-align:center;letter-spacing:2px;opacity:.9;}
+  #meters{position:absolute;right:14px;top:14px;width:min(190px,42vw);}
+  .meter{margin-bottom:9px;}
+  .meter .lab{display:flex;justify-content:space-between;font-size:.85em;letter-spacing:1px;margin-bottom:3px;}
+  .bar{height:9px;border:1px solid rgba(160,200,255,.55);background:rgba(0,15,35,.6);position:relative;overflow:hidden;}
+  .bar>div{position:absolute;inset:0;transform-origin:left;transition:transform .2s linear;}
+  #battFill{background:linear-gradient(90deg,#ffd24a,#ffe98a);box-shadow:0 0 8px #ffcf4a;}
+  #coldFill{background:linear-gradient(90deg,#4ab6ff,#bfe9ff);box-shadow:0 0 8px #6fd0ff;}
+  #alertFill{background:linear-gradient(90deg,#ff5b3a,#ff2020);box-shadow:0 0 8px #ff3b1f;}
+  #speedo{position:absolute;left:16px;bottom:16px;font-size:clamp(20px,4.5vmin,34px);letter-spacing:1px;}
+  #speedo small{font-size:.45em;opacity:.7;}
+  #alertText{position:absolute;top:96px;left:0;right:0;text-align:center;color:#ff4040;font-weight:bold;
+    letter-spacing:3px;font-size:clamp(13px,3vmin,20px);text-shadow:0 0 12px #ff0000;opacity:0;}
+  #alertText.on{animation:blink .5s steps(2) infinite;}
+  @keyframes blink{50%{opacity:.15}}
+  #chapterTag{position:absolute;left:14px;top:14px;opacity:.75;letter-spacing:2px;font-size:.85em;}
+  #toast{position:absolute;bottom:22vh;left:0;right:0;text-align:center;color:#ffe9a8;font-size:clamp(12px,2.6vmin,18px);
+    letter-spacing:1px;opacity:0;transition:opacity .4s;text-shadow:0 0 10px rgba(255,220,120,.7);}
+  #frost{position:absolute;inset:0;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at center,transparent 42%,rgba(170,220,255,.55) 100%);}
+  #dmg{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(255,0,0,.5) 100%);}
+
+  /* touch controls */
+  #touch{position:absolute;inset:0;display:none;pointer-events:none;}
+  .tbtn{position:absolute;pointer-events:auto;border:1px solid rgba(150,200,255,.6);border-radius:14px;
+    background:rgba(5,20,45,.55);color:#cfe8ff;display:flex;align-items:center;justify-content:center;
+    font-family:inherit;letter-spacing:2px;font-size:clamp(12px,2.6vmin,17px);user-select:none;touch-action:none;}
+  .tbtn:active,.tbtn.press{background:rgba(60,120,220,.5);}
+  #tLeft{left:4vw;bottom:5vh;width:17vw;height:13vh;}
+  #tRight{left:24vw;bottom:5vh;width:17vw;height:13vh;}
+  #tPedal{right:4vw;bottom:5vh;width:24vw;height:16vh;border-color:rgba(120,255,160,.7);color:#c9ffdb;}
+  #tTorch{right:31vw;bottom:5vh;width:17vw;height:13vh;}
+
+  /* ================= TERMINAL CRT ================= */
+  #term-wrap{position:absolute;inset:0;display:none;background:#020403;overflow:hidden;}
+  #crt{position:absolute;inset:0;padding:4vh 5vw;overflow-y:auto;cursor:text;
+    color:var(--green);font-size:clamp(12px,2.4vmin,18px);line-height:1.5;
+    text-shadow:0 0 4px currentColor, 0 0 12px rgba(57,255,106,.35);
+    background:radial-gradient(ellipse at center,#07130a 0%,#020603 75%,#000 100%);}
+  #crt.amber{color:var(--amber);text-shadow:0 0 4px currentColor,0 0 12px rgba(255,179,71,.35);
+    background:radial-gradient(ellipse at center,#140d04 0%,#060302 75%,#000 100%);}
+  #crt.red{color:#ff4d4d;text-shadow:0 0 6px currentColor,0 0 16px rgba(255,40,40,.5);
+    background:radial-gradient(ellipse at center,#180404 0%,#070101 75%,#000 100%);}
+  #crt::-webkit-scrollbar{width:0;}
+  #scanlines{position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px);
+    mix-blend-mode:multiply;}
+  #vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.75) 100%);}
+  #flicker{position:absolute;inset:0;pointer-events:none;background:rgba(120,255,150,.03);animation:flick 4s infinite;}
+  @keyframes flick{0%,100%{opacity:.6}8%{opacity:.15}9%{opacity:.7}54%{opacity:.3}55%{opacity:.8}}
+  #glare{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 60% 35% at 30% 12%,rgba(255,255,255,.06),transparent 60%);}
+  .ln{white-space:pre-wrap;word-break:break-word;min-height:1.2em;}
+  .ln.dim{color:#2f9b55;opacity:.8;}
+  .ln.warn{color:#ffd24a;}
+  .ln.err,.ln.alert{color:#ff5050;font-weight:bold;}
+  .ln.sys{color:#7fd4ff;}
+  .ln.user{color:#eaffea;}
+  .cursor{display:inline-block;width:.6em;height:1.05em;background:currentColor;vertical-align:-.15em;animation:cblink 1s steps(2) infinite;}
+  @keyframes cblink{50%{opacity:0}}
+  #tin-line{display:flex;gap:.5em;align-items:center;}
+  #tin{flex:1;background:transparent;border:none;outline:none;color:inherit;font:inherit;
+    text-shadow:inherit;caret-color:transparent;}
+  #shake{animation:none;}
+  .shakeit{animation:shk .08s linear infinite;}
+  @keyframes shk{25%{transform:translate(2px,-1px)}50%{transform:translate(-2px,1px)}75%{transform:translate(1px,2px)}}
+
+  .pbar{display:inline-block;border:1px solid currentColor;width:26ch;height:1.1em;vertical-align:middle;position:relative;overflow:hidden;}
+  .pbar i{position:absolute;left:0;top:0;bottom:0;background:currentColor;opacity:.85;display:block;}
+
+  /* ================= OVERLAY SCREENS ================= */
+  .overlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;background:#000;color:#cfe8ff;z-index:20;padding:6vw;}
+  .overlay h1{font-size:clamp(26px,7vmin,60px);letter-spacing:6px;margin-bottom:2vh;
+    color:#8fd0ff;text-shadow:0 0 18px rgba(90,170,255,.8);}
+  .glitch{position:relative;}
+  .glitch::before,.glitch::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;overflow:hidden;}
+  .glitch::before{color:#ff3b6b;transform:translate(2px,-2px);clip-path:inset(0 0 55% 0);animation:gl 2.4s infinite steps(2);}
+  .glitch::after{color:#39ff9c;transform:translate(-2px,2px);clip-path:inset(55% 0 0 0);animation:gl 3.1s infinite steps(2) reverse;}
+  @keyframes gl{0%,92%{opacity:0}93%{opacity:.9}96%{opacity:.4}100%{opacity:0}}
+  .overlay p{max-width:64ch;line-height:1.7;font-size:clamp(13px,2.6vmin,17px);opacity:.9;margin-bottom:3vh;white-space:pre-line;}
+  .btn{pointer-events:auto;cursor:pointer;border:1px solid #6fb6ff;color:#bfe2ff;background:rgba(10,30,60,.5);
+    padding:12px 34px;font-family:inherit;font-size:clamp(13px,2.8vmin,18px);letter-spacing:3px;margin:6px;}
+  .btn:hover{background:rgba(40,90,170,.6);box-shadow:0 0 14px rgba(90,170,255,.6);}
+  .btn.danger{border-color:#ff6060;color:#ffb0b0;background:rgba(60,5,5,.5);}
+  .btn.danger:hover{background:rgba(140,20,20,.6);box-shadow:0 0 14px rgba(255,60,60,.6);}
+  #title-sub{letter-spacing:3px;color:#5f8fbf;margin-bottom:5vh;font-size:clamp(11px,2.2vmin,15px);}
+  #title-tip{margin-top:6vh;font-size:clamp(10px,2vmin,13px);opacity:.55;letter-spacing:1px;white-space:pre-line;line-height:1.8;}
+  .card{border:1px solid rgba(120,180,255,.4);padding:4vh 6vw;background:rgba(2,10,24,.85);
+    box-shadow:0 0 40px rgba(40,110,220,.25) inset;}
+  #chapter-card h2{color:#ffd24a;text-shadow:0 0 14px rgba(255,200,60,.7);letter-spacing:4px;margin-bottom:2vh;}
+  #death-screen h1{color:#ff4b4b;text-shadow:0 0 20px rgba(255,30,30,.9);}
+  #death-screen .cause{color:#ff9c9c;letter-spacing:2px;margin-bottom:3vh;}
+  #win-screen h1{color:#7dffb0;text-shadow:0 0 18px rgba(60,255,150,.7);}
+  #end-screen h1{color:#ffe27a;text-shadow:0 0 22px rgba(255,220,90,.8);}
+  .stats{display:grid;grid-template-columns:auto auto;gap:6px 26px;margin-bottom:3vh;font-size:clamp(12px,2.4vmin,16px);}
+  .stats b{color:#8fd0ff;text-align:left;}
+  .stats span{text-align:right;color:#e6f2ff;}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#39ff6a;
+    letter-spacing:4px;z-index:30;background:#000;font-size:clamp(12px,3vmin,18px);}
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="c3d"></canvas>
+
+  <div id="hud">
+    <div class="top"><div id="compass"><span class="arr" id="compassArr">▲</span></div></div>
+    <div id="distLabel">EXTRACTION : --- m</div>
+    <div id="alertText">⚠ REPÉRÉ — RESTEZ HORS DES FAISCEAUX ⚠</div>
+    <div id="meters">
+      <div class="meter"><div class="lab"><span>BATTERIE TORCHE</span><span id="battPct">100%</span></div><div class="bar"><div id="battFill"></div></div></div>
+      <div class="meter"><div class="lab"><span>FROID</span><span id="coldPct">0%</span></div><div class="bar"><div id="coldFill"></div></div></div>
+      <div class="meter"><div class="lab"><span>ALERTE</span><span id="alertPct">0%</span></div><div class="bar"><div id="alertFill"></div></div></div>
+    </div>
+    <div id="chapterTag">CHAPITRE 1</div>
+    <div id="speedo">0 <small>KM/H</small></div>
+    <div id="toast"></div>
+    <div id="frost"></div>
+    <div id="dmg"></div>
+  </div>
+
+  <div id="touch">
+    <div class="tbtn" id="tLeft">◀</div>
+    <div class="tbtn" id="tRight">▶</div>
+    <div class="tbtn" id="tTorch">TORCHE</div>
+    <div class="tbtn" id="tPedal">PÉDALER</div>
+  </div>
+
+  <div id="term-wrap">
+    <div id="crt" class="screen">
+      <div id="tout"></div>
+      <div id="tin-line" style="display:none"><span id="prompt">&gt;&nbsp;</span><input id="tin" autocomplete="off" spellcheck="false"><span class="cursor"></span></div>
+    </div>
+    <div id="scanlines"></div>
+    <div id="flicker"></div>
+    <div id="glare"></div>
+    <div id="vignette"></div>
+    <div id="shake"></div>
+  </div>
+
+  <div class="overlay" id="title-screen" style="display:flex">
+    <h1 class="glitch" data-t="MAJESTIC-12">MAJESTIC-12</h1>
+    <div id="title-sub">PROTOCOLE GHOST // 1987 // LIGNE TERRESTRE NON SÉCURISÉE</div>
+    <p>Vous êtes GHOST_97. Un terminal, un modem 56k, une curiosité qui dépasse
+toutes les limites de bon sens. Ce soir, le wargame que vous avez lancé
+n'est pas un jeu.</p>
+    <div>
+      <button class="btn" id="btnNew">NOUVELLE PARTIE</button>
+      <button class="btn" id="btnContinue" style="display:none">CONTINUER</button>
+    </div>
+    <div id="title-tip">ZQSD / FLÈCHES : pédaler &amp; diriger   ·   T : torche   ·   ÉCRAN TACTILE : boutons
+Ne vous arrêtez jamais. Le froid et eux n'attendent pas.</div>
+  </div>
+
+  <div class="overlay" id="chapter-card">
+    <div class="card">
+      <h2 id="cc-title">CHAPITRE 1</h2>
+      <p id="cc-text"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="death-screen">
+    <h1 class="glitch" data-t="INTERCEPTÉ">INTERCEPTÉ</h1>
+    <div class="cause" id="death-cause"></div>
+    <button class="btn danger" id="btnRetry">REPRENDRE LA FUITE</button>
+  </div>
+
+  <div class="overlay" id="win-screen">
+    <h1 id="win-title">ZONE D'EXTRACTION ATTEINTE</h1>
+    <p id="win-text"></p>
+    <button class="btn" id="btnNext">RETOUR AU TERMINAL</button>
+  </div>
+
+  <div class="overlay" id="end-screen">
+    <h1 class="glitch" data-t="CONNEXION MONDIALE">CONNEXION MONDIALE</h1>
+    <p id="end-text"></p>
+    <div class="stats" id="end-stats"></div>
+    <button class="btn" id="btnRestart">REJOUER</button>
+  </div>
+
+  <div id="loading">INITIALISATION DU SYSTÈME…</div>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+/* ============================================================
+   OPÉRATION MAJESTIC — moteur de jeu
+============================================================ */
+const $ = id => document.getElementById(id);
+const G = {
+  screen:'title', chapter:1, maxChapter:1,
+  deaths:0, startTime:0,
+};
+try{ const s=localStorage.getItem('majestic_max'); if(s) G.maxChapter=parseInt(s)||1; }catch(e){}
+
+const CHAPTERS = [
+  { n:1, title:"CHAPITRE 1 — LE FAUX WARGAME",
+    text:"Vous croyez pirater le simulateur de défense de l'armée pour le fun.\nLa forêt vous dira la vérité.",
+    node:"MILNET-SIM-07", fwName:"PARE-FEU SIMULATION", fwCodes:3,
+    files:{
+      "readme.txt":"SIMULATEUR WARGAME v2.1 — USAGE ENTRAÎNEMENT UNIQUEMENT.\nToute intrusion sera tracée et punie (décret 884-C).",
+      "crew.log":"03:12 changement d'équipe. Note du sergent Hale :\n« Le simulateur reçoit encore du trafic réel. Personne ne veut en parler. »",
+    },
+    dlFile:"warplan.dat", dlLabel:"PLAN DE VOL OPÉRATIONNEL",
+    dlMsgs:[
+      ">> analyse du fichier…",
+      ">> INCOHÉRENCE : ceci n'est pas une simulation.",
+      ">> Protocole MAJESTIC-12 détecté.",
+      ">> Niveau d'alerte ogive nucléaire : ACTIF.",
+    ],
+    esc:{dist:600, agents:4, drones:0, blizzard:0.25, agentSpeed:5.2} },
+  { n:2, title:"CHAPITRE 2 — SILLAGE BIOLOGIQUE",
+    text:"Les serveurs de la base parlent d'échantillons qui ne devraient pas exister.\nCette nuit, des projecteurs patrouillent au-dessus des sapins.",
+    node:"DREAMLAND-51", fwName:"PARE-FEU DREAMLAND", fwCodes:4,
+    files:{
+      "manifest.dat":"MANIFESTE CONVOI 44 : conteneurs cryogéniques ×6.\nOrigine : site de récupération « PLATEAU BLANC ».\nClassification : MAJESTIC — ŒIL UNIQUEMENT.",
+      "bio.log":"SUJET B-7 : métabolisme non terrestre. Température de\nconservation : -196°C. Note du docteur Voss :\n« Il répond aux stimuli. Il connaît nos couloirs. »",
+      "ping.log":"03:33 — émission radio non identifiée depuis l'intérieur du convoi.\nFréquence : 1420 MHz. La fréquence de l'hydrogène.",
+    },
+    dlFile:"specimen_b7.dat", dlLabel:"DOSSIER SUJET BIOLOGIQUE B-7",
+    dlMsgs:[
+      ">> décompression… 4,2 Go d'imagerie médicale.",
+      ">> AVERTISSEMENT : le sujet n'est pas humain.",
+      ">> AVERTISSEMENT : le sujet n'est PAS mort.",
+      ">> un ping vient de répondre depuis VOTRE segment de réseau.",
+    ],
+    esc:{dist:800, agents:5, drones:2, blizzard:0.45, agentSpeed:5.6} },
+  { n:3, title:"CHAPITRE 3 — LE GRAND DÉCRYPTAGE",
+    text:"Vous avez mis la main sur les codes de lancement.\nIls ne veulent plus vous arrêter. Ils veulent vous effacer.",
+    node:"PERIMETER-NUCLEAR", fwName:"PARE-FEU OGIVE", fwCodes:5, needDecode:true,
+    files:{
+      "silo.map":"SILO 9-C : statut ARMÉ. Clés de vol en attente\nd'autorisation MAJESTIC niveau OMEGA.",
+      "orders.txt":"ORDRE 7734 : « Si l'intrus franchit le périmètre, aucune\ntrace ne doit rester. Ni lui, ni la neige qu'il a touchée. »",
+    },
+    dlFile:"launch_codes.dat", dlLabel:"CODES DE LANCEMENT — CLÉ OMEGA",
+    dlMsgs:[
+      ">> déchiffrement AES… clé OMEGA requise.",
+      ">> clé OMEGA trouvée dans la mémoire du sujet B-7.",
+      ">> AVERTISSEMENT : 44 silos répondent à ces codes.",
+      ">> le blizzard se lève. Ce n'est pas la météo.",
+    ],
+    esc:{dist:1000, agents:6, drones:3, blizzard:0.7, agentSpeed:6.0} },
+  { n:4, title:"CHAPITRE 4 — LE GRAND FINAL",
+    text:"Dernière planque : la station radio clandestine du col.\nUploadez les preuves avant que la base ne soit rasée. Puis courez.",
+    node:"MAJESTIC-CORE", fwName:"CŒUR MAJESTIC", fwCodes:6, needDecode:true,
+    files:{
+      "purge.log":"COMPTE À REBOURS DE PURGE THERMITE : 00:09:41.\nObjectif : effacer MAJESTIC-12 et tous les témoins.",
+      "witness.txt":"Liste des témoins à « traiter ». Votre pseudonyme\nGHOST_97 est en tête de liste. Votre adresse réelle\nfigure en dessous.",
+    },
+    dlFile:"majestic_full.dat", dlLabel:"ARCHIVE COMPLÈTE MAJESTIC-12",
+    dlMsgs:[
+      ">> 31 ans d'opérations occultes. 218 Go.",
+      ">> inclusion : 6 sujets biologiques. 1 toujours actif.",
+      ">> le compte à rebours de purge s'accélère.",
+      ">> ils savent où vous êtes. Ils arrivent.",
+    ],
+    esc:{dist:1200, agents:7, drones:4, blizzard:1.0, agentSpeed:6.4} },
+];
+
+/* ============================================================
+   AUDIO (WebAudio, tout est synthétisé)
+============================================================ */
+const AU = {
+  ac:null, master:null, windGain:null, droneGain:null, started:false,
+  init(){
+    if(this.ac) return;
+    const AC = window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    this.ac = new AC();
+    this.master = this.ac.createGain(); this.master.gain.value=0.5; this.master.connect(this.ac.destination);
+    const len = this.ac.sampleRate*2, buf=this.ac.createBuffer(1,len,this.ac.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=this.ac.createBufferSource(); src.buffer=buf; src.loop=true;
+    const bp=this.ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=400; bp.Q.value=0.6;
+    this.windGain=this.ac.createGain(); this.windGain.gain.value=0;
+    src.connect(bp); bp.connect(this.windGain); this.windGain.connect(this.master); src.start();
+    const o=this.ac.createOscillator(); o.type='sawtooth'; o.frequency.value=62;
+    const lfo=this.ac.createOscillator(); lfo.frequency.value=7;
+    const lg=this.ac.createGain(); lg.gain.value=14; lfo.connect(lg); lg.connect(o.frequency);
+    this.droneGain=this.ac.createGain(); this.droneGain.gain.value=0;
+    o.connect(this.droneGain); this.droneGain.connect(this.master); o.start(); lfo.start();
+    this.started=true;
+  },
+  t(){ return this.ac?this.ac.currentTime:0; },
+  tone(f,dur=.1,type='square',vol=.15,slide=0){
+    if(!this.started) return;
+    const o=this.ac.createOscillator(), g=this.ac.createGain();
+    o.type=type; o.frequency.value=f;
+    if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide), this.t()+dur);
+    g.gain.setValueAtTime(vol,this.t()); g.gain.exponentialRampToValueAtTime(.0001,this.t()+dur);
+    o.connect(g); g.connect(this.master); o.start(); o.stop(this.t()+dur+.02);
+  },
+  noise(dur=.2,vol=.2,freq=800){
+    if(!this.started) return;
+    const len=this.ac.sampleRate*dur, b=this.ac.createBuffer(1,len,this.ac.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+    const s=this.ac.createBufferSource(); s.buffer=b;
+    const f=this.ac.createBiquadFilter(); f.type='lowpass'; f.frequency.value=freq;
+    const g=this.ac.createGain(); g.gain.value=vol;
+    s.connect(f); f.connect(g); g.connect(this.master); s.start();
+  },
+  key(){ this.tone(1800+Math.random()*600,.015,'square',.05); },
+  beep(f=880,d=.08){ this.tone(f,d,'square',.12); },
+  ok(){ this.tone(660,.07,'square',.12); setTimeout(()=>this.tone(990,.09,'square',.12),80); },
+  bad(){ this.tone(220,.2,'sawtooth',.15,-80); },
+  alarm(){
+    if(!this.started) return;
+    for(let i=0;i<4;i++){ setTimeout(()=>{this.tone(760,.16,'square',.2);setTimeout(()=>this.tone(520,.16,'square',.2),170);}, i*360); }
+  },
+  breach(){ this.noise(1.2,.5,300); this.tone(70,.9,'sawtooth',.3,-30); },
+  modem(){
+    if(!this.started) return;
+    const seq=[[1200,.4],[2100,.5],[980,.3],[1400,.3],[2225,1.2]];
+    let t=0;
+    seq.forEach(([f,d])=>{ setTimeout(()=>this.tone(f,d,'sine',.16), t*1000); t+=d*.7; });
+    setTimeout(()=>this.noise(1.6,.12,3000), t*1000);
+  },
+  heartbeat(){ this.tone(55,.1,'sine',.4); setTimeout(()=>this.tone(48,.12,'sine',.35),180); },
+  chain(){ this.tone(2400+Math.random()*500,.012,'square',.03); },
+  wind(v){ if(this.windGain) this.windGain.gain.linearRampToValueAtTime(v*.5, this.t()+.8); },
+  droneHum(v){ if(this.droneGain) this.droneGain.gain.linearRampToValueAtTime(Math.max(0,v)*.12, this.t()+.4); },
+};
+
+/* ============================================================
+   TERMINAL
+============================================================ */
+const T = {
+  el:null, out:null, input:null, decodeDone:false,
+  init(){
+    this.el=$('crt'); this.out=$('tout'); this.input=$('tin');
+    this.input.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){
+        const v=this.input.value; this.input.value='';
+        this.ln('<span style="opacity:.75">'+esc(this.curPrompt||'> ')+'</span> '+esc(v),'user');
+        this.input.disabled=true;
+        this.resolveInput(v);
+      } else if(e.key.length===1) AU.key();
+      e.stopPropagation();
+    });
+  },
+  show(mode='green'){
+    this.el.className = mode==='amber'?'amber':mode==='red'?'red':'';
+    $('term-wrap').style.display='block'; this.el.style.display='block';
+    G.screen='terminal';
+  },
+  hide(){ $('term-wrap').style.display='none'; },
+  clear(){ this.out.innerHTML=''; },
+  ln(html, cls=''){ const d=document.createElement('div'); d.className='ln '+cls; d.innerHTML=html; this.out.appendChild(d); this.scroll(); return d; },
+  scroll(){ this.el.scrollTop=this.el.scrollHeight; },
+  type(text, cls='', cps=42){
+    return new Promise(res=>{
+      const d=this.ln('', cls); let i=0;
+      const step=()=>{
+        i+=1+(Math.random()<.3?1:0);
+        d.textContent=text.slice(0,i);
+        if(Math.random()<.25) AU.key();
+        this.scroll();
+        if(i<text.length) setTimeout(step, 1000/cps + (Math.random()<.06?120:0));
+        else { d.textContent=text; res(); }
+      };
+      step();
+    });
+  },
+  ask(prompt='> '){
+    return new Promise(res=>{
+      this.curPrompt=prompt;
+      this.resolveInput = v=>{ $('tin-line').style.display='none'; res(v.trim()); };
+      $('prompt').innerHTML = esc(prompt)+'&nbsp;';
+      $('tin-line').style.display='flex';
+      this.input.disabled=false; this.scroll();
+      setTimeout(()=>this.input.focus(),30);
+    });
+  },
+  resolveInput(){},
+  progress(label, ms=2200){
+    return new Promise(res=>{
+      const d=this.ln(label+' <span class="pbar"><i style="width:0%"></i></span> <b class="pct">0%</b>');
+      const bar=d.querySelector('i'), pct=d.querySelector('.pct');
+      const t0=performance.now();
+      const tick=()=>{
+        const p=Math.min(1,(performance.now()-t0)/ms);
+        bar.style.width=(p*100)+'%'; pct.textContent=Math.floor(p*100)+'%';
+        if(Math.random()<.4) AU.key();
+        this.scroll();
+        if(p<1) requestAnimationFrame(tick); else { AU.ok(); res(); }
+      };
+      requestAnimationFrame(tick);
+    });
+  },
+  async pause(ms){ await new Promise(r=>setTimeout(r,ms)); },
+};
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---- mini-jeux ---- */
+const CODES=['GHOST','NEIGE','MODEM','PIVERT','ORION','CIRCUIT','PHOSPHORE','ANTENNE','CRYO','SAPIN','VOLTA','KILO'];
+
+async function minigameFirewall(ch){
+  await T.type('[ '+ch.fwName+' v4.2 — '+ch.fwCodes+' couches actives ]','sys');
+  await T.type("Chaque couche exige un code d'accès. Les fragments captés s'affichent — retapez-les avant la fin du chrono.",'dim');
+  for(let i=0;i<ch.fwCodes;i++){
+    const word=CODES[Math.floor(Math.random()*CODES.length)]+'-'+(100+Math.floor(Math.random()*900));
+    const time=4200+i*300;
+    await T.type('\nCOUCHE '+(i+1)+'/'+ch.fwCodes+' — fragment capte : « '+word+' »','warn');
+    const t0=performance.now();
+    const v=await T.ask('code>');
+    if(performance.now()-t0>time || v.toUpperCase()!==word.toUpperCase()){
+      AU.bad(); await T.type('!! DÉLAI DÉPASSÉ / CODE INVALIDE — nouvelle tentative','err');
+      i--; continue;
+    }
+    AU.ok(); await T.type('couche '+(i+1)+' percée.','dim');
+  }
+  await T.type('PARE-FEU CONTOURNÉ. Accès shell obtenu.','sys');
+}
+
+async function minigameDecode(){
+  await T.type('[ DÉCHIFFREMENT CLÉ OMEGA — mot de passe masqué ]','sys');
+  const secret=CODES[Math.floor(Math.random()*CODES.length)].toUpperCase();
+  let revealed=new Set([Math.floor(Math.random()*secret.length)]);
+  let tries=0;
+  while(true){
+    const masked=secret.split('').map((c,i)=>revealed.has(i)?c:'_').join(' ');
+    await T.type('clé : '+masked+'    ('+secret.length+' lettres — indice : mot lié au froid, au signal ou au code)','warn');
+    const v=(await T.ask('clé>')).toUpperCase();
+    if(v===secret){ AU.ok(); await T.type('CLÉ OMEGA ACCEPTÉE.','sys'); return; }
+    tries++;
+    if(v && v.length===1){ secret.split('').forEach((c,i)=>{ if(c===v) revealed.add(i); }); AU.beep(700,.06); }
+    else { AU.bad(); await T.type('rejeté.','err'); }
+    if(tries>=2){ const idx=Array.from({length:secret.length},(_,i)=>i).find(i=>!revealed.has(i)); if(idx!==undefined) revealed.add(idx); }
+    if(revealed.size>=secret.length){ await T.type("la clé s'est révélée d'elle-même : "+secret,'dim'); return; }
+  }
+}
+
+/* ---- session de hack d'un chapitre ---- */
+async function hackSession(ch){
+  T.show(G.chapter>=2?'amber':'green');
+  T.clear();
+  T.decodeDone=false;
+  await T.type('PHOSPHOR-DOS v3.1 — 640K OK — modem 56k prêt','dim');
+  await T.type('Tapez HELP pour la liste des commandes.','dim');
+  let connected=false, downloaded=false, alerted=false;
+  const HELP =
+"Commandes disponibles :\n"+
+"  HELP            cette aide\n"+
+"  SCAN            balayer les réseaux voisins\n"+
+"  CONNECT <noeud> se connecter a un noeud\n"+
+"  LS              lister les fichiers distants\n"+
+"  CAT <fichier>   lire un fichier\n"+
+"  DOWNLOAD <fichier>  telecharger un fichier\n"+
+"  DECODE          lancer le dechiffrement (si cle requise)\n"+
+"  WHOAMI / CLEAR  evidents";
+
+  while(!alerted){
+    const cmd=await T.ask('GHOST_97@phosphor:~$');
+    const parts=cmd.split(/\s+/); const c=(parts[0]||'').toLowerCase(); const arg=parts.slice(1).join(' ');
+    if(c==='') continue;
+    if(c==='help'){ T.ln(esc(HELP),'dim'); }
+    else if(c==='clear'){ T.clear(); }
+    else if(c==='whoami'){ await T.type("GHOST_97 — 17 ans — chambre 12, rue des Peupliers",'dim'); }
+    else if(c==='sudo'){ await T.type("GHOST_97 n'est pas dans le fichier sudoers. Cet incident sera signalé. (blague)",'warn'); }
+    else if(c==='scan'){
+      AU.beep(500,.1); await T.progress('balayage des fréquences', 1500);
+      await T.type('1 noeud trouvé : '+ch.node+' [CHIFFRÉ — MAJESTIC]','sys');
+      await T.type('astuce : CONNECT '+ch.node,'dim');
+    }
+    else if(c==='connect'){
+      if(arg.toUpperCase()!==ch.node){ await T.type("noeud inconnu. Lancez SCAN d'abord.",'err'); continue; }
+      if(connected){ await T.type('déjà connecté.','dim'); continue; }
+      AU.modem(); await T.type('numérotation… échange de trames…','dim'); await T.pause(2600);
+      await minigameFirewall(ch);
+      connected=true;
+      await T.type('shell distant obtenu. Essayez LS.','sys');
+    }
+    else if(c==='ls'){
+      if(!connected){ await T.type('non connecté.','err'); continue; }
+      T.ln(Object.keys(ch.files).map(f=>'-rw-r--r--  '+f).join('\n')+'\n-rw-r--r--  '+ch.dlFile+'   [CLASSIFIÉ MAJESTIC]','dim');
+    }
+    else if(c==='cat'){
+      if(!connected){ await T.type('non connecté.','err'); continue; }
+      if(ch.files[arg]){ await T.type(ch.files[arg],'warn'); }
+      else await T.type('fichier introuvable.','err');
+    }
+    else if(c==='decode'){
+      if(!ch.needDecode){ await T.type('rien à déchiffrer ici.','dim'); continue; }
+      if(!connected){ await T.type('non connecté.','err'); continue; }
+      await minigameDecode();
+      T.decodeDone=true;
+    }
+    else if(c==='download'){
+      if(!connected){ await T.type('non connecté.','err'); continue; }
+      if(arg!==ch.dlFile){ await T.type('fichier introuvable. Essayez LS.','err'); continue; }
+      if(ch.needDecode && !T.decodeDone){ await T.type("fichier chiffré clé OMEGA. Lancez DECODE d'abord.",'err'); continue; }
+      if(downloaded){ await T.type('déjà téléchargé.','dim'); continue; }
+      downloaded=true;
+      await T.progress('téléchargement de '+ch.dlFile, 3000);
+      for(const m of ch.dlMsgs){ await T.pause(500); await T.type(m, m.indexOf('>>')===0?'warn':'err'); }
+      alerted=true;
+      await triggerAlert();
+    }
+    else { await T.type('commande inconnue : '+c,'err'); }
+  }
+}
+
+async function triggerAlert(){
+  T.show('red');
+  $('term-wrap').classList.add('shakeit');
+  AU.alarm();
+  await T.pause(400);
+  await T.type('*** ALERTE *** ALERTE *** ALERTE ***','alert');
+  await T.type('INTRUSION DÉTECTÉE — LOCALISATION EN COURS','alert');
+  await T.type("TRAÇAGE : votre adresse réelle vient d'être résolue.",'err');
+  await T.type('UNITÉ AU SOL DÉPATCHÉE. ETA : 60 secondes.','err');
+  await T.pause(1200);
+  AU.breach();
+  await T.type('LA PORTE DE LA CAVE VIENT DE CÉDER.','alert');
+  await T.type('COUREZ. LE VÉLO. LA FORÊT. MAINTENANT.','alert');
+  await T.pause(1600);
+  $('term-wrap').classList.remove('shakeit');
+  T.hide();
+  startChapterEscape(CHAPTERS[G.chapter-1]);
+}
+
+/* ============================================================
+   MOTEUR 3D
+============================================================ */
+let renderer, scene, camera, clock;
+let bike, torch, torchCone, riderLegL, riderLegR, wheelF, wheelB;
+let trees=[]; let snow; let agents=[]; let drones=[];
+let cabin;
+const keys={};
+const touchState={left:false,right:false,pedal:false,torch:false};
+let E=null;
+
+function init3D(){
+  renderer = new THREE.WebGLRenderer({canvas:$('c3d'), antialias:true, powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, .1, 500);
+  clock = new THREE.Clock();
+  addEventListener('resize', ()=>{
+    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+}
+
+function buildWorld(cfg){
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x0a1220, 0.012 + cfg.blizzard*0.012);
+  renderer.setClearColor(0x05080f);
+
+  const moon=new THREE.DirectionalLight(0x8fb0ff,.35); moon.position.set(-60,80,-40); scene.add(moon);
+  scene.add(new THREE.AmbientLight(0x22304a,.5));
+
+  const ggeo=new THREE.PlaneGeometry(500,700,90,110);
+  const pos=ggeo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i), y=pos.getY(i);
+    pos.setZ(i, Math.sin(x*.08)*Math.cos(y*.06)*1.2 + Math.sin(x*.023+y*.031)*2.2);
+  }
+  ggeo.computeVertexNormals();
+  const ground=new THREE.Mesh(ggeo, new THREE.MeshStandardMaterial({color:0xcdd8ea, roughness:.95}));
+  ground.rotation.x=-Math.PI/2; ground.position.z=-250; scene.add(ground);
+
+  const N=700;
+  const trunkG=new THREE.CylinderGeometry(.22,.34,3,6);
+  const trunkM=new THREE.MeshStandardMaterial({color:0x2a1f16, roughness:1});
+  const folG=new THREE.ConeGeometry(1.9,6,7);
+  const folM=new THREE.MeshStandardMaterial({color:0x11281c, roughness:.9});
+  const snowG=new THREE.ConeGeometry(1.35,2.2,7);
+  const snowM=new THREE.MeshStandardMaterial({color:0xe8f0fb, roughness:.9});
+  const trunks=new THREE.InstancedMesh(trunkG,trunkM,N);
+  const fols=new THREE.InstancedMesh(folG,folM,N);
+  const caps=new THREE.InstancedMesh(snowG,snowM,N);
+  trees=[];
+  const m=new THREE.Matrix4(), q=new THREE.Quaternion(), s=new THREE.Vector3(), p=new THREE.Vector3();
+  let placed=0, guard=0;
+  while(placed<N && guard++<8000){
+    const x=(Math.random()-.5)*440;
+    const z=20-Math.random()*640;
+    if(Math.abs(x)<7) continue;
+    const sc=.7+Math.random()*1.1;
+    p.set(x,1.5*sc,z); s.set(sc,sc,sc); q.identity();
+    m.compose(p,q,s); trunks.setMatrixAt(placed,m);
+    p.y=3*sc+2.6*sc; m.compose(p,q,s); fols.setMatrixAt(placed,m);
+    p.y=3*sc+5.2*sc; m.compose(p,q,s); caps.setMatrixAt(placed,m);
+    trees.push({x,z,r:.55*sc});
+    placed++;
+  }
+  trunks.count=fols.count=caps.count=placed;
+  scene.add(trunks); scene.add(fols); scene.add(caps);
+
+  cabin=new THREE.Group();
+  const wallM=new THREE.MeshStandardMaterial({color:0x3a2c1e, roughness:1});
+  const body=new THREE.Mesh(new THREE.BoxGeometry(6,3.4,5), wallM); body.position.y=1.7; cabin.add(body);
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(5,2.4,4), new THREE.MeshStandardMaterial({color:0xdfe9f7, roughness:.9}));
+  roof.position.y=4.5; roof.rotation.y=Math.PI/4; cabin.add(roof);
+  const door=new THREE.Mesh(new THREE.PlaneGeometry(1.2,2.2), new THREE.MeshStandardMaterial({color:0xffd24a, emissive:0xffaa00, emissiveIntensity:1.4}));
+  door.position.set(0,1.2,2.53); cabin.add(door);
+  const win=new THREE.Mesh(new THREE.PlaneGeometry(1,1), new THREE.MeshStandardMaterial({color:0xaad4ff, emissive:0x66aaff, emissiveIntensity:1.2}));
+  win.position.set(1.8,1.8,2.53); cabin.add(win);
+  const cl=new THREE.PointLight(0xffb84a,2.2,26); cl.position.set(0,2.4,3.4); cabin.add(cl);
+  cabin.position.set(0,0,-cfg.dist-8);
+  scene.add(cabin);
+  const beacon=new THREE.PointLight(0x66ff99,1.6,60); beacon.position.set(0,8,-cfg.dist-8); scene.add(beacon);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,9,6), new THREE.MeshStandardMaterial({color:0x555555}));
+  mast.position.set(2.6,4.5,-cfg.dist-8); scene.add(mast);
+
+  // vélo + pilote
+  bike=new THREE.Group();
+  const frameM=new THREE.MeshStandardMaterial({color:0xb03030, roughness:.5, metalness:.5});
+  const tireM=new THREE.MeshStandardMaterial({color:0x111111, roughness:.9});
+  wheelF=new THREE.Mesh(new THREE.TorusGeometry(.42,.08,8,20), tireM); wheelF.position.set(0,.42,.62); wheelF.rotation.y=Math.PI/2; bike.add(wheelF);
+  wheelB=new THREE.Mesh(new THREE.TorusGeometry(.42,.08,8,20), tireM); wheelB.position.set(0,.42,-.62); wheelB.rotation.y=Math.PI/2; bike.add(wheelB);
+  const bar=new THREE.Mesh(new THREE.BoxGeometry(.12,.1,1.3), frameM); bar.position.set(0,.62,0); bike.add(bar);
+  const post=new THREE.Mesh(new THREE.BoxGeometry(.08,.5,.08), frameM); post.position.set(0,.55,-.2); bike.add(post);
+  const handle=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.6,6), new THREE.MeshStandardMaterial({color:0x333333,metalness:.7,roughness:.4}));
+  handle.rotation.z=Math.PI/2; handle.position.set(0,.85,.55); bike.add(handle);
+  const lamp=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.16,8), new THREE.MeshStandardMaterial({color:0x222222, emissive:0xffe9a0, emissiveIntensity:.8}));
+  lamp.rotation.x=Math.PI/2; lamp.position.set(0,.85,.7); bike.add(lamp);
+  torch=new THREE.SpotLight(0xffedbe, 0, 55, .48, .45, 1.2);
+  torch.position.set(0,.9,.7);
+  const ttarget=new THREE.Object3D(); ttarget.position.set(0,0,18); bike.add(ttarget); torch.target=ttarget; bike.add(torch);
+  torchCone=new THREE.Mesh(new THREE.ConeGeometry(3.2,16,16,1,true),
+    new THREE.MeshBasicMaterial({color:0xffedbe, transparent:true, opacity:0, side:THREE.DoubleSide, depthWrite:false}));
+  torchCone.rotation.x=-Math.PI/2; torchCone.position.set(0,.85,8.7); bike.add(torchCone);
+  const bodyM=new THREE.MeshStandardMaterial({color:0x2b3d5c, roughness:.8});
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.22,.5,4,8), bodyM); torso.position.set(0,1.15,-.1); torso.rotation.x=.7; bike.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.17,10,10), new THREE.MeshStandardMaterial({color:0xd9b38c, roughness:.9}));
+  head.position.set(0,1.5,.18); bike.add(head);
+  const beanie=new THREE.Mesh(new THREE.SphereGeometry(.185,10,8,0,Math.PI*2,0,Math.PI/2), new THREE.MeshStandardMaterial({color:0x772233, roughness:1}));
+  beanie.position.set(0,1.52,.18); bike.add(beanie);
+  const backpack=new THREE.Mesh(new THREE.BoxGeometry(.34,.4,.2), new THREE.MeshStandardMaterial({color:0x5a4632, roughness:1}));
+  backpack.position.set(0,1.25,-.42); bike.add(backpack);
+  const legM=new THREE.MeshStandardMaterial({color:0x1c2433});
+  riderLegL=new THREE.Mesh(new THREE.CapsuleGeometry(.07,.4,3,6), legM);
+  riderLegR=new THREE.Mesh(new THREE.CapsuleGeometry(.07,.4,3,6), legM);
+  riderLegL.position.set(-.14,.6,-.05); riderLegR.position.set(.14,.6,-.05);
+  bike.add(riderLegL); bike.add(riderLegR);
+  const glow=new THREE.PointLight(0x8899bb,.5,7); glow.position.set(0,1,0); bike.add(glow);
+  scene.add(bike);
+
+  // neige
+  const SN=2600;
+  const sg=new THREE.BufferGeometry();
+  const sp=new Float32Array(SN*3);
+  for(let i=0;i<SN;i++){ sp[i*3]=(Math.random()-.5)*90; sp[i*3+1]=Math.random()*30; sp[i*3+2]=(Math.random()-.5)*90; }
+  sg.setAttribute('position', new THREE.BufferAttribute(sp,3));
+  snow=new THREE.Points(sg, new THREE.PointsMaterial({color:0xdfe9ff, size:.16, transparent:true, opacity:.9, depthWrite:false}));
+  scene.add(snow);
+
+  // agents
+  agents=[];
+  const agentM=new THREE.MeshStandardMaterial({color:0x0c0e14, roughness:.6, metalness:.2});
+  const eyeM=new THREE.MeshStandardMaterial({color:0xff2020, emissive:0xff2020, emissiveIntensity:3});
+  for(let i=0;i<cfg.agents;i++){
+    const a=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.CapsuleGeometry(.26,1,4,8), agentM); b.position.y=1.05; a.add(b);
+    const e1=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6), eyeM); e1.position.set(-.09,1.6,.22); a.add(e1);
+    const e2=e1.clone(); e2.position.x=.09; a.add(e2);
+    const tag=new THREE.Mesh(new THREE.PlaneGeometry(.5,.12), new THREE.MeshStandardMaterial({color:0xffcc00, emissive:0xffaa00, emissiveIntensity:.8}));
+    tag.position.set(0,1.85,.2); a.add(tag);
+    scene.add(a); agents.push({g:a, speed:cfg.agentSpeed+Math.random()*.6, phase:Math.random()*10});
+  }
+
+  // drones
+  drones=[];
+  const dM=new THREE.MeshStandardMaterial({color:0x1a1f2b, roughness:.4, metalness:.6});
+  const ledM=new THREE.MeshStandardMaterial({color:0xff3050, emissive:0xff3050, emissiveIntensity:3});
+  for(let i=0;i<cfg.drones;i++){
+    const d=new THREE.Group();
+    const hull=new THREE.Mesh(new THREE.SphereGeometry(.7,10,8), dM); d.add(hull);
+    const led=new THREE.Mesh(new THREE.SphereGeometry(.1,6,6), ledM); led.position.set(0,.75,0); d.add(led);
+    for(let k=0;k<4;k++){
+      const arm=new THREE.Mesh(new THREE.BoxGeometry(.9,.05,.08), dM);
+      arm.rotation.y=k*Math.PI/2+Math.PI/4; arm.position.y=.3; d.add(arm);
+      const rotor=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.02,10),
+        new THREE.MeshBasicMaterial({color:0x88aacc, transparent:true, opacity:.25}));
+      const ang=k*Math.PI/2+Math.PI/4;
+      rotor.position.set(Math.cos(ang)*.9,.36,Math.sin(ang)*.9); rotor.name='rotor'; d.add(rotor);
+    }
+    const beam=new THREE.SpotLight(0xfff2cc, 0, 60, .32, .5, 1);
+    beam.position.set(0,-.4,0);
+    const bt=new THREE.Object3D(); bt.position.set(0,-30,0); d.add(bt); beam.target=bt; d.add(beam);
+    d.userData.beam=beam;
+    scene.add(d); drones.push({g:d, beam:beam, sweep:Math.random()*10});
+  }
+}
+
+function startChapterEscape(ch){
+  const cfg=ch.esc;
+  buildWorld(cfg);
+  E={
+    cfg, ch, pos:new THREE.Vector3(0,0,6), heading:Math.PI, speed:0,
+    battery:100, cold:0, alert:0, torchOn:true, detected:false,
+    done:false, t:0, chainT:0, hbT:0, shakeT:0, tKey:false,
+  };
+  bike.position.copy(E.pos); bike.rotation.y=E.heading;
+  agents.forEach((a,i)=>{
+    const ang=Math.PI + (i-cfg.agents/2)*.5 + (Math.random()-.5)*.4;
+    const d=26+Math.random()*30;
+    a.g.position.set(E.pos.x+Math.sin(ang)*d, 0, E.pos.z+Math.cos(ang)*d);
+  });
+  drones.forEach((d,i)=>{
+    d.g.position.set((Math.random()-.5)*60, 10+Math.random()*4, E.pos.z-40-i*30);
+  });
+  $('c3d').style.display='block';
+  $('hud').style.display='block';
+  if('ontouchstart' in window) $('touch').style.display='block';
+  $('chapterTag').textContent='CHAPITRE '+ch.n;
+  G.screen='escape';
+  AU.wind(cfg.blizzard);
+  toast(ch.n===1 ? 'PÉDALEZ ! ATTEIGNEZ LA CABANE AU FOND DE LA FORÊT' : 'FUYEZ ! ILS SONT DÉJÀ DANS LA FORÊT');
+  clock.getDelta();
+  renderer.setAnimationLoop(escapeTick);
+}
+
+function toast(msg, ms=2600){
+  const t=$('toast'); t.textContent=msg; t.style.opacity=1;
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0, ms);
+}
+
+function endEscape(win, cause){
+  if(!E || E.done) return;
+  E.done=true;
+  renderer.setAnimationLoop(null);
+  AU.wind(0); AU.droneHum(0);
+  $('c3d').style.display='none'; $('hud').style.display='none'; $('touch').style.display='none';
+  G.screen='between';
+  if(win){
+    if(G.chapter>=G.maxChapter){ G.maxChapter=Math.min(4,G.chapter+1); try{localStorage.setItem('majestic_max',G.maxChapter);}catch(e){} }
+    $('win-text').textContent = "Vous avez planqué le vélo dans la remise, rallumé le modem en silence. Il reste du travail.";
+    $('btnNext').textContent = G.chapter>=4 ? 'VOIR LA FIN' : 'RETOUR AU TERMINAL';
+    $('win-screen').style.display='flex';
+  } else {
+    G.deaths++;
+    $('death-cause').textContent = cause||'';
+    $('death-screen').style.display='flex';
+  }
+}
+
+const _v1=new THREE.Vector3(), _v2=new THREE.Vector3(), _v3=new THREE.Vector3();
+
+const escapeTick = ()=>{
+  const dt=Math.min(.05, clock.getDelta());
+  const cfg=E.cfg;
+  E.t+=dt;
+
+  const pedal = keys['KeyW']||keys['ArrowUp']||keys['Space']||touchState.pedal;
+  const left  = keys['KeyA']||keys['ArrowLeft']||keys['KeyQ']||touchState.left;
+  const right = keys['KeyD']||keys['ArrowRight']||touchState.right;
+  if(keys['KeyT'] && !E.tKey){ E.torchOn=!E.torchOn; E.tKey=true; AU.beep(E.torchOn?900:500,.06); }
+  if(!keys['KeyT']) E.tKey=false;
+
+  const maxV=11.5, accel=6.5, drag=1.4;
+  if(pedal) E.speed=Math.min(maxV, E.speed+accel*dt);
+  else E.speed=Math.max(0, E.speed-drag*dt);
+  const steer=(left?1:0)-(right?1:0);
+  E.heading += steer * 1.9 * dt * Math.min(1, E.speed/4+.15);
+  const dir=_v1.set(Math.sin(E.heading),0,Math.cos(E.heading));
+  E.pos.addScaledVector(dir, E.speed*dt);
+
+  for(const tr of trees){
+    const dx=E.pos.x-tr.x, dz=E.pos.z-tr.z;
+    const rr=tr.r+.5;
+    if(dx*dx+dz*dz < rr*rr){
+      const d=Math.sqrt(dx*dx+dz*dz)||.01;
+      E.pos.x=tr.x+dx/d*rr; E.pos.z=tr.z+dz/d*rr;
+      E.speed*=.25; AU.noise(.15,.25,500); E.shakeT=.25;
+      break;
+    }
+  }
+  if(Math.abs(E.pos.x)>210){ E.pos.x=Math.sign(E.pos.x)*210; E.speed*=.5; }
+  if(E.pos.z>16){ E.pos.z=16; E.speed*=.5; }
+  if(E.pos.z<-cfg.dist-40){ E.pos.z=-cfg.dist-40; }
+
+  if(E.torchOn){ E.battery=Math.max(0, E.battery - dt*1.4); }
+  const battF=E.battery/100;
+  const flick = battF<.25 ? (Math.random()<.12?0.2:1) : 1;
+  torch.intensity = E.torchOn ? (2.6*battF+.4)*flick : 0;
+  torchCone.material.opacity = E.torchOn ? .07*battF*flick : 0;
+  if(E.battery<=0 && E.torchOn){ E.torchOn=false; toast('BATTERIE MORTE — TROUVEZ LA CABANE DANS LE NOIR'); AU.bad(); }
+
+  if(E.speed<3) E.cold=Math.min(100, E.cold + dt*(4.5+cfg.blizzard*3));
+  else E.cold=Math.max(0, E.cold - dt*2.2);
+  if(E.cold>=100){ endEscape(false,'HYPOTHERMIE. La neige a gardé votre chaleur. Et votre vélo.'); return; }
+
+  // drones
+  let seen=false;
+  let hum=0;
+  drones.forEach((d)=>{
+    d.beam.intensity = 5;
+    d.sweep+=dt;
+    const ahead=_v2.copy(E.pos).addScaledVector(dir, 18+Math.sin(d.sweep*.7)*10);
+    _v3.set(ahead.x+Math.sin(d.sweep)*8, 11+Math.sin(d.sweep*1.3)*1.5, ahead.z);
+    d.g.position.lerp(_v3, dt*.5);
+    d.g.rotation.y+=dt*2;
+    for(const c of d.g.children){ if(c.name==='rotor') c.rotation.y+=dt*40; }
+    const gy=d.g.position.y;
+    _v3.set(d.g.position.x, 0, d.g.position.z + Math.tan(.32)*gy);
+    const distToBeam=E.pos.distanceTo(_v3);
+    if((distToBeam<7 && E.torchOn) || distToBeam<4) seen=true;
+    hum=Math.max(hum, 1-Math.min(1, d.g.position.distanceTo(E.pos)/40));
+  });
+  AU.droneHum(hum);
+  if(seen && !E.detected){ AU.alarm(); toast('UN FAISCEAU VOUS A CERNÉ — CHANGEZ DE CAP !'); }
+  E.detected=seen;
+  if(seen) E.alert=Math.min(100, E.alert+dt*22);
+  else E.alert=Math.max(0, E.alert-dt*4);
+
+  // agents
+  const boost = seen?1.55 : (E.alert>60?1.25:1);
+  let nearest=1e9;
+  for(const a of agents){
+    const toP=_v2.subVectors(E.pos, a.g.position); toP.y=0;
+    const d=toP.length(); nearest=Math.min(nearest,d);
+    const sp=a.speed*boost*(E.speed<2?1.25:1);
+    if(d>.1) a.g.position.addScaledVector(toP.normalize(), Math.min(sp*dt, d));
+    a.g.rotation.y=Math.atan2(toP.x,toP.z);
+    a.phase+=dt*6;
+    a.g.position.y=Math.abs(Math.sin(a.phase))*.06;
+    if(d<1.7){ endEscape(false,'INTERCEPTÉ PAR LES AGENTS DU MAJESTIC. « Aucune trace. Ni lui, ni la neige. »'); return; }
+  }
+  if(nearest<25){ E.hbT-=dt; if(E.hbT<=0){ AU.heartbeat(); E.hbT=Math.max(.35, nearest/25*1.1); } }
+
+  // victoire
+  const distCabin=E.pos.distanceTo(cabin.position);
+  if(distCabin<6){ endEscape(true); return; }
+
+  // visuel vélo
+  bike.position.copy(E.pos);
+  bike.rotation.y=E.heading;
+  bike.rotation.z=-steer*.14*Math.min(1,E.speed/8);
+  const wr=E.speed*dt/.42;
+  wheelF.rotation.x+=wr; wheelB.rotation.x+=wr;
+  const pedalAnim = pedal? Math.sin(E.t*9)*.5 : Math.sin(E.t*1.2)*.06;
+  riderLegL.rotation.x=pedalAnim; riderLegR.rotation.x=-pedalAnim;
+  E.chainT-=dt;
+  if(pedal && E.chainT<=0){ AU.chain(); E.chainT=Math.max(.05, .5-E.speed*.04); }
+
+  // caméra
+  const camBack=_v2.copy(E.pos).addScaledVector(dir,-6.5); camBack.y=3.2;
+  const look=_v3.copy(E.pos).addScaledVector(dir,8); look.y=1.4;
+  camera.position.lerp(camBack, 1-Math.pow(.0018,dt));
+  camera.position.y=3.2;
+  camera.lookAt(look);
+  if(E.shakeT>0){ E.shakeT-=dt; camera.position.x+=(Math.random()-.5)*.3; camera.position.y+=(Math.random()-.5)*.2; }
+  if(seen){ camera.position.x+=(Math.random()-.5)*.12; camera.position.y+=(Math.random()-.5)*.08; }
+
+  // neige
+  const sp=snow.geometry.attributes.position;
+  const fall=6+cfg.blizzard*10, drift=2+cfg.blizzard*6;
+  for(let i=0;i<sp.count;i++){
+    let y=sp.getY(i)-fall*dt;
+    let x=sp.getX(i)+Math.sin(E.t+i)*drift*dt;
+    if(y<0){ y=28; x=(Math.random()-.5)*90; sp.setZ(i,(Math.random()-.5)*90); }
+    sp.setY(i,y); sp.setX(i,x);
+  }
+  sp.needsUpdate=true;
+  snow.position.set(E.pos.x,0,E.pos.z);
+
+  // HUD
+  $('speedo').innerHTML=Math.round(E.speed*3.6)+' <small>KM/H</small>';
+  $('battFill').style.transform='scaleX('+(E.battery/100)+')';
+  $('battPct').textContent=Math.round(E.battery)+'%';
+  $('coldFill').style.transform='scaleX('+(E.cold/100)+')';
+  $('coldPct').textContent=Math.round(E.cold)+'%';
+  $('alertFill').style.transform='scaleX('+(E.alert/100)+')';
+  $('alertPct').textContent=Math.round(E.alert)+'%';
+  $('frost').style.opacity=Math.max(0,(E.cold-40)/60)*.9;
+  const toCabin=_v2.subVectors(cabin.position,E.pos);
+  const ang=Math.atan2(toCabin.x,toCabin.z)-E.heading;
+  $('compassArr').style.transform='rotate('+(ang*180/Math.PI)+'deg)';
+  $('distLabel').textContent='EXTRACTION : '+Math.max(0,Math.round(distCabin))+' m';
+  $('alertText').classList.toggle('on', seen);
+  $('dmg').style.opacity=seen?.7:0;
+};
+
+/* ============================================================
+   NAVIGATION / ÉCRANS
+============================================================ */
+function showChapterCard(ch){
+  $('cc-title').textContent=ch.title;
+  $('cc-text').textContent=ch.text;
+  $('chapter-card').style.display='flex';
+  AU.beep(440,.12); setTimeout(()=>AU.beep(660,.15),150);
+  setTimeout(()=>{ $('chapter-card').style.display='none'; hackSession(ch); }, 3400);
+}
+
+function startChapter(n){
+  G.chapter=n;
+  const ch=CHAPTERS[n-1];
+  $('title-screen').style.display='none';
+  showChapterCard(ch);
+}
+
+function showEnding(){
+  $('win-screen').style.display='none';
+  const mins=Math.max(1,Math.round((performance.now()-G.startTime)/60000));
+  $('end-text').textContent=
+"À 04:12, l'archive MAJESTIC-12 se réplique sur 14 000 serveurs,\ndes dortoirs de Tokyo aux bibliothèques de Reykjavik.\n\nÀ 04:13, la base du Plateau Blanc est rasée par le thermite.\nIl n'en restera qu'un cratère et votre vélo, encore chaud, appuyé\ncontre la station radio.\n\nLe monde se réveille avec les preuves dans sa boîte mail.\nPersonne ne trouvera jamais GHOST_97. Il n'est plus qu'une ligne\nparmi quatorze mille — et la neige, cette nuit, n'a rien retenu.";
+  $('end-stats').innerHTML=
+'<b>CHAPITRES SURVÉCUS</b><span>4 / 4</span>'+
+'<b>INTERCEPTIONS</b><span>'+G.deaths+'</span>'+
+'<b>TEMPS EN LIGNE</b><span>~'+mins+' min</span>'+
+'<b>STATUT DU SUJET B-7</b><span>INCONNU</span>';
+  $('end-screen').style.display='flex';
+  AU.beep(520,.2); setTimeout(()=>AU.beep(780,.3),220);
+}
+
+$('btnNew').onclick=()=>{ AU.init(); G.startTime=performance.now(); G.deaths=0; startChapter(1); };
+$('btnContinue').onclick=()=>{ AU.init(); G.startTime=performance.now(); G.deaths=0; startChapter(G.maxChapter); };
+$('btnRetry').onclick=()=>{ $('death-screen').style.display='none'; startChapterEscape(CHAPTERS[G.chapter-1]); };
+$('btnNext').onclick=()=>{
+  $('win-screen').style.display='none';
+  if(G.chapter>=4) showEnding();
+  else startChapter(G.chapter+1);
+};
+$('btnRestart').onclick=()=>{ $('end-screen').style.display='none'; G.startTime=performance.now(); G.deaths=0; startChapter(1); };
+
+addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.code)>=0) e.preventDefault();
+});
+addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+function bindTouch(id, prop){
+  const el=$(id);
+  const on=e=>{ e.preventDefault(); touchState[prop]=true; el.classList.add('press'); AU.init(); };
+  const off=e=>{ e.preventDefault(); touchState[prop]=false; el.classList.remove('press'); };
+  el.addEventListener('touchstart',on,{passive:false});
+  el.addEventListener('touchend',off,{passive:false});
+  el.addEventListener('touchcancel',off,{passive:false});
+  el.addEventListener('mousedown',on); el.addEventListener('mouseup',off);
+  el.addEventListener('mouseleave',off);
+}
+bindTouch('tLeft','left'); bindTouch('tRight','right');
+bindTouch('tPedal','pedal'); bindTouch('tTorch','torch');
+
+if(G.maxChapter>1) $('btnContinue').style.display='inline-block';
+$('loading').style.display='none';
+T.init();
+</script>
+</body>
+</html>
