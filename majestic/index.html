@@ -155,7 +155,7 @@
   <div id="term-wrap">
     <div id="crt" class="screen">
       <div id="tout"></div>
-      <div id="tin-line" style="display:none"><span id="prompt">&gt;&nbsp;</span><input id="tin" autocomplete="off" spellcheck="false"><span class="cursor"></span></div>
+      <div id="tin-line" style="display:none"><span id="prompt">&gt;&nbsp;</span><input id="tin" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off" enterkeyhint="done"><span class="cursor"></span></div>
     </div>
     <div id="scanlines"></div>
     <div id="flicker"></div>
@@ -365,6 +365,7 @@ const T = {
       } else if(e.key.length===1) AU.key();
       e.stopPropagation();
     });
+    this.el.addEventListener('click', ()=>{ if(this.input && !this.input.disabled) this.input.focus(); });
   },
   show(mode='green'){
     this.el.className = mode==='amber'?'amber':mode==='red'?'red':'';
@@ -395,9 +396,15 @@ const T = {
       this.resolveInput = v=>{ $('tin-line').style.display='none'; res(v.trim()); };
       $('prompt').innerHTML = esc(prompt)+'&nbsp;';
       $('tin-line').style.display='flex';
+      this.input.value='';
       this.input.disabled=false; this.scroll();
       setTimeout(()=>this.input.focus(),30);
     });
+  },
+  cancelAsk(){
+    $('tin-line').style.display='none';
+    this.input.disabled=true; this.input.value='';
+    this.resolveInput=()=>{};
   },
   resolveInput(){},
   progress(label, ms=2200){
@@ -418,21 +425,33 @@ const T = {
   async pause(ms){ await new Promise(r=>setTimeout(r,ms)); },
 };
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function norm(s){ return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
 /* ---- mini-jeux ---- */
 const CODES=['GHOST','NEIGE','MODEM','PIVERT','ORION','CIRCUIT','PHOSPHORE','ANTENNE','CRYO','SAPIN','VOLTA','KILO'];
 
 async function minigameFirewall(ch){
   await T.type('[ '+ch.fwName+' v4.2 — '+ch.fwCodes+' couches actives ]','sys');
-  await T.type("Chaque couche exige un code d'accès. Les fragments captés s'affichent — retapez-les avant la fin du chrono.",'dim');
+  await T.type("Chaque couche exige un code d'accès. Retapez le fragment capté avant la fin du compte à rebours — majuscules ou pas, tiret optionnel.",'dim');
   for(let i=0;i<ch.fwCodes;i++){
     const word=CODES[Math.floor(Math.random()*CODES.length)]+'-'+(100+Math.floor(Math.random()*900));
-    const time=4200+i*300;
-    await T.type('\nCOUCHE '+(i+1)+'/'+ch.fwCodes+' — fragment capte : « '+word+' »','warn');
-    const t0=performance.now();
-    const v=await T.ask('code>');
-    if(performance.now()-t0>time || v.toUpperCase()!==word.toUpperCase()){
-      AU.bad(); await T.type('!! DÉLAI DÉPASSÉ / CODE INVALIDE — nouvelle tentative','err');
+    const time=10000+i*1000;
+    await T.type('\nCOUCHE '+(i+1)+'/'+ch.fwCodes+' — fragment capté : « '+word+' »','warn');
+    let left=Math.round(time/1000);
+    const cd=setInterval(()=>{ left--; if(left>=0) $('prompt').innerHTML=esc('code ['+left+'s]> '); },1000);
+    const v=await Promise.race([
+      T.ask('code ['+left+'s]> '),
+      new Promise(r=>setTimeout(()=>r(null), time))
+    ]);
+    clearInterval(cd);
+    if(v===null){
+      T.cancelAsk(); AU.bad();
+      await T.type('!! TEMPS ÉCOULÉ — nouveau fragment généré, réessayez…','err');
+      i--; continue;
+    }
+    if(norm(v)!==norm(word)){
+      AU.bad();
+      await T.type('!! CODE INVALIDE (attendu : '+word+') — nouveau fragment…','err');
       i--; continue;
     }
     AU.ok(); await T.type('couche '+(i+1)+' percée.','dim');
